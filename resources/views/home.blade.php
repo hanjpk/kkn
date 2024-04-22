@@ -118,6 +118,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
 <script src="https://onaci.github.io/leaflet-velocity/dist/leaflet-velocity.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://npmcdn.com/leaflet@1.0.3/dist/leaflet.js/leaflet.icon-pulse.js"></script>
 <script>
     var Esri_WorldImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, ' +
@@ -132,13 +133,60 @@
         layers: [Esri_WorldImagery]
     });
 
-    map.setView([-1.664501, 118.840201], 4);
+    map.setView([-6.0322, 106.7141], 11);
 
     var layerControl = L.control.layers(baseLayers);
     layerControl.addTo(map);
 
-    function getCurrentArray() {
-        $.get('https://maritim.bmkg.go.id/pusmar/api23/arr_req/inaflows/cur/202401020000/202401020000/0', function(res) {
+    var livePinLocation = [-6.097557918736245, 106.71410276591264];
+    var marker = L.marker(livePinLocation, {
+        icon: L.icon({
+            iconUrl: '{{ asset('img/location.png') }}', // Specify your icon image path
+            iconSize: [24, 24], // Size of the icon
+            iconAnchor: [12, 12] // Point of the icon which will correspond to marker's location
+        }),
+        bounceOnAdd: true, // Enable bouncing effect
+        bounceOnAddOptions: {duration: 1000, height: 100}, // Duration and height of the bouncing
+        bounceOnAddCallback: function() {console.log("marker added");} // Callback for completion
+    }).addTo(map);
+
+    
+    
+    getModelRunDates();
+
+    function getModelRunDates() {
+        $.get('https://maritim.bmkg.go.id/pusmar/api23/modelrun', function(res) {
+            const dateTime = formatDate(res.inaflows[0]);
+            console.log("Formatted Model Run Date Time:", dateTime); // Print the formatted date to the console
+            getCurrentArray(dateTime);
+            getWaveArray(dateTime);
+            getWindArray(dateTime);
+        }).fail(function(error) {
+            console.error('Failed to fetch model run dates:', error);
+        });
+    }
+
+    function formatDate(dateStr) {
+    const date = new Date(dateStr);
+    // Create a zero-padded function for single-digit components
+    function pad(number) {
+        if (number < 10) {
+            return '0' + number;
+        }
+        return number;
+    }
+    // Format date to 'YYYYMMDDHHMM'
+    return date.getUTCFullYear() +
+           pad(date.getUTCMonth() + 1) +
+           pad(date.getUTCDate()) +
+           pad(date.getUTCHours()) +
+           pad(date.getUTCMinutes());
+    }
+
+    function getCurrentArray(dateTime) {
+        const url = `https://maritim.bmkg.go.id/pusmar/api23/arr_req/inaflows/cur/${dateTime}/${dateTime}/0`;
+        console.log("Current Array URL:", url); // Debug the URL
+        $.get(url, function(res) {
             var data = JSON.parse(res);
             console.log(data);
             var vel = L.velocityLayer({
@@ -149,18 +197,20 @@
                     displayEmptyString: 'No water data',
                 },
                 data: data,
-                maxVelocity: 1.5,
+                maxVelocity: 2.5,
                 velocityScale: 0.2
             });
             layerControl.addOverlay(vel, 'Current - Inaflows');
             vel.addTo(map);
         }).fail(function(error) {
             console.error(error);
-        });
+         });
     }
 
-    function getWaveArray() {
-        $.get('https://maritim.bmkg.go.id/pusmar/api23/arr_req/inawaves/dir/202401020000/202401020000', function(res) {
+    function getWaveArray(dateTime) {
+        const url = `https://maritim.bmkg.go.id/pusmar/api23/arr_req/inawaves/dir/${dateTime}/${dateTime}`;
+        console.log("Wave Array URL:", url); // Debug the URL
+        $.get(url, function(res) {
             var data = JSON.parse(res);
             console.log(data);
             var vel = L.velocityLayer({
@@ -172,17 +222,19 @@
                 },
                 data: data,
                 maxVelocity: 4,
-                velocityScale: 0.1
+                velocityScale: 0.1 
             });
             layerControl.addOverlay(vel, 'Wave - Inawaves');
             // vel.addTo(map);
         }).fail(function(error) {
-            console.error(error);
+            console.error('API Call Failed:', error);
         });
     }
 
-    function getWindArray() {
-        $.get('https://maritim.bmkg.go.id/pusmar/api23/arr_req/inawaves/wind/202401020000/202401020000', function(res) {
+    function getWindArray(dateTime) {
+        const url = `https://maritim.bmkg.go.id/pusmar/api23/arr_req/inawaves/wind/${dateTime}/${dateTime}`;
+        console.log("Wind Array URL:", url); // Debug the URL
+        $.get(url, function(res) {
             var data = JSON.parse(res);
             console.log(data);
             var vel = L.velocityLayer({
@@ -194,18 +246,16 @@
                 },
                 data: data,
                 maxVelocity: 20,
-                velocityScale: 0.01
+                velocityScale: 0.01 
             });
             layerControl.addOverlay(vel, 'Wind - Inawaves');
             // vel.addTo(map);
         }).fail(function(error) {
-            console.error(error);
+            console.error('API Call Failed:', error);
         });
     }
 
-    getCurrentArray();
-    getWaveArray();
-    getWindArray();
+
 </script>
 
 @endsection
